@@ -158,12 +158,11 @@ const ChangeTitle = ({dispatch, control}) =>
     Change Title
   </button>;
 
-const LogInForm = ({error}: {error:string}) => { // eslint-disable-line no-unused-vars
+const LogInForm = ({error}: {error:string, isMobile: boolean}) => { // eslint-disable-line no-unused-vars
   return(
     <div class="section">
       <div class="container" style={{
-          maxWidth: '400px'
-          , borderStyle: 'solid'
+            borderStyle: 'solid'
           , borderWidth: '1px'
           , borderColor: 'rgba(0,0,0,0.2)'
           , padding: '10px'
@@ -182,9 +181,12 @@ const LogInForm = ({error}: {error:string}) => { // eslint-disable-line no-unuse
   );
 };
 
-const Hero = () => {
+const Hero = ({isMobile}: {isMobile: boolean}) => {
+  const cl = isMobile
+    ? 'hero is-light is-bold is-medium'
+    : 'hero is-light is-bold';
   return(
-    <section class="hero is-light is-bold">
+    <section class={cl}>
       <div class="hero-body">
         <div class="container">
           <h1 class="title">
@@ -231,6 +233,6 @@ export const App = enhance(({store, dispatch}) => { // eslint-disable-line no-un
          {ShowTitle({title: store.title})}
          {ChangeTitle({dispatch: dispatch, control: cs})}
        </div>;
-  return <div><Hero />{view}</div>;
+  return <div class='bd-main'><Hero isMobile={store.isMobile}/>{view}</div>;
   }
 );

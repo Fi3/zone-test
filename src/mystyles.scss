@@ -1,2 +1,11 @@
 @charset "utf-8";
 @import "../node_modules/bulma/bulma.sass";
+
+html {
+  @include tablet {
+    font-size: 3rem;
+  }
+  @include desktop {
+    font-size: 1rem;
+  }
+}
