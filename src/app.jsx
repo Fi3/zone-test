@@ -161,18 +161,41 @@ const ChangeTitle = ({dispatch, control}) =>
 const LogInForm = ({error}: {error:string}) => { // eslint-disable-line no-unused-vars
   return(
     <div class="section">
-      <div class="container" style={{ maxWidth: '400px'}}>
+      <div class="container" style={{
+          maxWidth: '400px'
+          , borderStyle: 'solid'
+          , borderWidth: '1px'
+          , borderColor: 'rgba(0,0,0,0.2)'
+          , padding: '10px'
+        }}>
         <div class="label">
           <div classs="control">
             <label class="label">API Key</label>
             <p class='help'>You need a <a>MovieDB API Key</a> in order to access movies' data</p>
-            <input class="input is-primary" type="text" placeholder="MovieDB API key..."></input>
+            <input class="input is-light" type="text" placeholder="MovieDB API key..."></input>
             <p class="help is-danger">{error}</p>
-            <button class="button is-link">Submit</button>
+            <button class="button is-light">Submit</button>
           </div>
         </div>
       </div>
     </div>
+  );
+};
+
+const Hero = () => {
+  return(
+    <section class="hero is-light is-bold">
+      <div class="hero-body">
+        <div class="container">
+          <h1 class="title">
+            Movie Explore
+          </h1>
+          <h2 class="subtitle">
+            Find what to watch this night
+          </h2>
+        </div>
+      </div>
+    </section>
   );
 };
 
@@ -208,6 +231,6 @@ export const App = enhance(({store, dispatch}) => { // eslint-disable-line no-un
          {ShowTitle({title: store.title})}
          {ChangeTitle({dispatch: dispatch, control: cs})}
        </div>;
-    return view;
+  return <div><Hero />{view}</div>;
   }
 );
