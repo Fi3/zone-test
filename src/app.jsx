@@ -1,6 +1,7 @@
 /* @flow */
 import { withReducer } from 'recompose';
 import React from 'react'; // eslint-disable-line no-unused-vars
+import {map, splitEvery, concat, repeat, length} from 'ramda';
 
 // UTILS --section
 const getPosterUrl = (title: string): PosterUrl => `https//:${title}.com`; // eslint-disable-line
@@ -91,12 +92,22 @@ const reducer = (state: Model, action: Action): Model => {
 opaque type PosterUrl = string; // eslint-disable-line
 
 type Movie =
-  {| +tile: string,
+  {| +title: string,
      +genres: Array<string>,
      +poster: PosterUrl,       // eslint-disable-line
      +rating: number,
      +isSelected: boolean,
-  |}
+  |} | 'nullMovie'
+
+const testMovie : Movie =
+  { title: 'TITLE'
+  , genres: ['Genere']
+  , poster: 'noUrl'
+  , rating: 6
+  , isSelected: true
+  };
+
+const nullMovie : Movie = 'nullMovie';
 
 type Model =
   {| +title: string,
@@ -158,7 +169,7 @@ const ChangeTitle = ({dispatch, control}) =>
     Change Title
   </button>;
 
-const LogInForm = ({error}: {error:string, isMobile: boolean}) => { // eslint-disable-line no-unused-vars
+const LogInForm = ({error}: {error:string}) => { // eslint-disable-line no-unused-vars
   return(
     <div class="section">
       <div class="container" style={{
@@ -181,7 +192,7 @@ const LogInForm = ({error}: {error:string, isMobile: boolean}) => { // eslint-di
   );
 };
 
-const Hero = ({isMobile}: {isMobile: boolean}) => {
+const Hero = ({isMobile}: {isMobile: boolean}) => { // eslint-disable-line no-unused-vars
   const cl = isMobile
     ? 'hero is-light is-bold is-medium'
     : 'hero is-light is-bold';
@@ -189,10 +200,10 @@ const Hero = ({isMobile}: {isMobile: boolean}) => {
     <section class={cl}>
       <div class="hero-body">
         <div class="container">
-          <h1 class="title">
-            Movie Explore
+          <h1 class="title is-3">
+            Movie Explorer
           </h1>
-          <h2 class="subtitle">
+          <h2 class="subtitle is-3">
             Find what to watch this night
           </h2>
         </div>
@@ -201,6 +212,45 @@ const Hero = ({isMobile}: {isMobile: boolean}) => {
   );
 };
 
+const MovieBox = ({movie}: {movie: Movie}) => { // eslint-disable-line no-unused-vars
+  return(
+    <div class='column'>
+      { movie !== 'nullMovie'
+        ? <div class='box has-text-centered'>
+           <h1 class='title is-5'>{movie.title}</h1>
+           <img src={require('../src/no-image.png')} height='300' width='200' />
+           <p>Genere: {movie.genres}</p>
+           <p>Rating: {movie.rating} / 10</p>
+         </div>
+        : <div></div>
+      }
+    </div>
+  );
+};
+
+
+const MovieExplorer = ({movies}: {movies: Array<Movie>}) => { // eslint-disable-line no-unused-vars
+  // it render 5 column in any device but mobile
+  // it render (len movies) / 5 row in any device but mobile it render (len movies) rows on mobile
+  return(
+    map(
+      (subMovieList) => {
+        return (
+          <div class="columns is-desktop" style={{margin: '50px'}}>
+            {map(
+              (movie) => MovieBox({movie: movie})
+              , subMovieList
+            )}
+          </div>
+        );}
+      , map( (x) => concat(x, repeat(nullMovie, 4 - length(x))), splitEvery(4, movies))
+    )
+  );
+};
+
+//const FilterBox = () => { // eslint-disable-line no-unused-vars
+//  return(
+    
 
 // BOOTSTRAP
 const intialControlState =
@@ -233,6 +283,7 @@ export const App = enhance(({store, dispatch}) => { // eslint-disable-line no-un
          {ShowTitle({title: store.title})}
          {ChangeTitle({dispatch: dispatch, control: cs})}
        </div>;
-  return <div class='bd-main'><Hero isMobile={store.isMobile}/>{view}</div>;
+  //return <div class='bd-main'><Hero isMobile={store.isMobile}/>{view}</div>;
+  return <div class='bd-main'><Hero isMobile={store.isMobile}/>{MovieExplorer({movies: repeat(testMovie, 13)})}</div>;
   }
 );
