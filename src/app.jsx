@@ -109,12 +109,17 @@ const testMovie : Movie =
 
 const nullMovie : Movie = 'nullMovie';
 
+type ActiveDrop = 'gen' | 'rating' | ''
+
 type Model =
   {| +title: string,
      +movies: Array<Movie>,
      +isMobile: boolean,
      +credentials: string,
      +controlState: ControlState,
+     +activeDrop: ActiveDrop,
+     +filterdGeneres: Array<string>,
+     +filterdRatings: Array<number>,
   |}
 
 // CONTROL STATE
@@ -236,7 +241,7 @@ const MovieExplorer = ({movies}: {movies: Array<Movie>}) => { // eslint-disable-
     map(
       (subMovieList) => {
         return (
-          <div class="columns is-desktop" style={{margin: '50px'}}>
+          <div class="columns is-desktop" style={{marginLeft: '40px', marginRight: '40px'}}>
             {map(
               (movie) => MovieBox({movie: movie})
               , subMovieList
@@ -248,8 +253,104 @@ const MovieExplorer = ({movies}: {movies: Array<Movie>}) => { // eslint-disable-
   );
 };
 
-//const FilterBox = () => { // eslint-disable-line no-unused-vars
-//  return(
+const FilterBox = ( // eslint-disable-line no-unused-vars
+  {generes, ratings, activeDrop, filterdGeneres, filterdRatings}: 
+  {
+    generes: Array<string>
+    , ratings: Array<number>
+    , activeDrop: ActiveDrop
+    , filterdGeneres: Array<string>
+    , filterdRatings: Array<number>
+  }) => {
+  const genresClass =
+    activeDrop === 'gen'
+      ? 'dropdown is-active'
+      : 'dropdown';
+  const ratingClass =
+    activeDrop === 'rating'
+      ? 'dropdown is-active'
+      : 'dropdown';
+  return(
+    <div class='section' style={{marginLeft: '40px', marginRight: '40px'}}>
+      <div class="title is-4">
+        Filter
+      </div>
+      <div>
+        <div class={genresClass}>
+          <div class="dropdown-trigger">
+            <button class="button" aria-haspopup="true" aria-controls="dropdown-menu">
+              <span>Generes</span>
+              <span class="icon is-small">
+                <i class="fas fa-angle-down" aria-hidden="true"></i>
+              </span>
+            </button>
+          </div>
+          <div class="dropdown-menu" id="dropdown-menu" role="menu">
+            <div class="dropdown-content">
+              {map(
+                (genere) => {
+                  return(
+                    <a href="#" class="dropdown-item">
+                      {genere}
+                    </a>);}
+                , generes)
+              }
+            </div>
+          </div>
+        </div>
+        {map(
+          (genre) => {
+            return(
+              <a class="button is-success is-outlined" style={{marginLeft: '10px'}}>
+                <span>{genre}</span>
+                <span class="icon is-small">
+                  <i class="fas fa-times"></i>
+                </span>
+              </a>
+            );}
+          , filterdGeneres)
+        }
+      </div>
+      <div>
+        <div class={ratingClass}>
+          <div class="dropdown-trigger">
+            <button class="button" aria-haspopup="true" aria-controls="dropdown-menu">
+              <span>Rating</span>
+              <span class="icon is-small">
+                <i class="fas fa-angle-down" aria-hidden="true"></i>
+              </span>
+            </button>
+          </div>
+          <div class="dropdown-menu" id="dropdown-menu" role="menu">
+            <div class="dropdown-content">
+              {map(
+                (rating) => {
+                  return(
+                    <a href="#" class="dropdown-item">
+                      {rating}
+                    </a>);}
+                , ratings)
+              }
+            </div>
+          </div>
+          {map(
+            (rating) => {
+              return(
+                <a class="button is-success is-outlined" style={{marginLeft: '10px'}}>
+                  <span>{rating}</span>
+                  <span class="icon is-small">
+                    <i class="fas fa-times"></i>
+                  </span>
+                </a>
+              );}
+            , filterdRatings)
+          }
+        </div>
+      </div>
+    </div>
+  );
+};
+
     
 
 // BOOTSTRAP
@@ -267,6 +368,9 @@ const initialState: Model =
     isMobile: false,
     credentials: '',
     controlState: intialControlState,
+    activeDrop: '',
+    filterdGeneres: ['ciao'],
+    filterdRatings: [2,3],
   };
 
 const enhance = withReducer('store', 'dispatch', reducer, initialState);
@@ -284,6 +388,18 @@ export const App = enhance(({store, dispatch}) => { // eslint-disable-line no-un
          {ChangeTitle({dispatch: dispatch, control: cs})}
        </div>;
   //return <div class='bd-main'><Hero isMobile={store.isMobile}/>{view}</div>;
-  return <div class='bd-main'><Hero isMobile={store.isMobile}/>{MovieExplorer({movies: repeat(testMovie, 13)})}</div>;
+  return <div class='bd-main'><Hero isMobile={store.isMobile}/>
+    {
+      [
+        FilterBox({
+            generes: ['a','s','d','f']
+          , ratings: [1,2,3,4], activeDrop: store.activeDrop
+          , filterdGeneres: store.filterdGeneres
+          , filterdRatings: store.filterdRatings
+        })
+        , MovieExplorer({movies: repeat(testMovie, 13)})
+      ]
+    }
+    </div>;
   }
 );
