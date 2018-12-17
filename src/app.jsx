@@ -1,10 +1,13 @@
 /* @flow */
 import { withReducer } from 'recompose';
 import React from 'react'; // eslint-disable-line no-unused-vars
-import {map, splitEvery, concat, repeat, length} from 'ramda';
+import {map, splitEvery, concat, repeat, length, mergeAll, assoc, take, append} from 'ramda';
+import theMovieDb from 'themoviedb-javascript-library';
 
 // UTILS --section
-const getPosterUrl = (title: string): PosterUrl => `https//:${title}.com`; // eslint-disable-line
+const getPosterUrl = (path: string): PosterUrl => `https://image.tmdb.org/t/p/w200/${path}`; // eslint-disable-line
+const setMovieDBKey = (key: string) => theMovieDb.common.api_key = key; 
+const promisify = (f, ...args) => new Promise((res, rej) => f(args, res, rej));
 
 // UPDATE --section
 type ActionUpdateTitle =
@@ -26,11 +29,22 @@ type ActionUpdateControl =
      +control: ControlState,
   |};
 
+type ActionUpdateImages =
+  {| +type: 'ActionUpdateImages'
+  |};
+
+type ActionUpdateMovies =
+  {| +type: 'ActionUpdateMovies',
+     +movies: Array<Movie>
+  |};
+
 type Action =
   | ActionUpdateTitle
   | ActionDoNothing
   | ActionUpdateCredentials
   | ActionUpdateControl
+  | ActionUpdateImages
+  | ActionUpdateMovies
 
 const udpateTitle = (title: string): ActionUpdateTitle => { // eslint-disable-line no-unused-vars
   return {
@@ -59,7 +73,23 @@ const udpateControl = (control: ControlState): ActionUpdateControl => { // eslin
   };
 };
 
+const updateImages = (): ActionUpdateImages => { // eslint-disable-line no-unused-vars
+  return {
+    type: 'ActionUpdateImages',
+  };
+};
+
+const updateMovies = (movies: Array<Movie>): ActionUpdateMovies => { // eslint-disable-line no-unused-vars
+  return {
+    type: 'ActionUpdateMovies',
+    movies,
+  };
+};
+
 const reducer = (state: Model, action: Action): Model => {
+  console.log(state, action); // eslint-disable-line
+  action = controller(state.controlState, action);
+  console.log(state, action); // eslint-disable-line
   if (typeof state === 'undefined') {
     return initialState;
   }
@@ -70,7 +100,14 @@ const reducer = (state: Model, action: Action): Model => {
   }
 
   case 'ActionUpdateCredentials': {
-    return {...state, credentials: action.credentials};
+    setMovieDBKey(action.credentials);
+    const checkCredentials = () => true;
+    const isValid = checkCredentials();
+    return {
+      ...state
+      , credentials: action.credentials
+      , controlState: {...state.controlState, credentialAreValid: isValid, hasCredential: true}
+    };
   }
 
   case 'ActionDoNothing': {
@@ -79,6 +116,14 @@ const reducer = (state: Model, action: Action): Model => {
 
   case 'ActionUpdateControl': {
     return {...state, controlState: action.control};
+  }
+
+  case 'ActionUpdateImages': {
+    return {...state};
+  }
+
+  case 'ActionUpdateMovies': {
+    return {...state, movies: action.movies};
   }
 
   // trick to have flow errors when we do not handle all the action types
@@ -166,15 +211,25 @@ const controller = (controlState: ControlState, action: Action): Action => {
 
 
 // VIEWS --section
-const ShowTitle = ({title}) => <h1>{title}</h1>;
-const ChangeTitle = ({dispatch, control}) =>
+const ShowTitle = ({title}) => <h1>{title}</h1>; // eslint-disable-line
+const ChangeTitle = ({dispatch, control}) => // eslint-disable-line
   <button
-    onClick={() => dispatch(controller(control, udpateTitle('cani')))}
+    onClick={() => dispatch(udpateTitle('cani'))}
   >
     Change Title
   </button>;
 
-const LogInForm = ({error}: {error:string}) => { // eslint-disable-line no-unused-vars
+const LogInForm = ({error, dispatch, store}: {error:string, dispatch: (any) => any, store: Model}) => { // eslint-disable-line no-unused-vars
+  const state = {apiKey: ''};
+  const doLogin = async () => {
+    await dispatch(udpateCredentials(state.apiKey));
+    fetchMovies(store, dispatch);
+  };
+  const onReturn = (e) => {
+    if (e.keyCode === 13 && state.apiKey !== '') {
+      doLogin();
+    }
+  }; 
   return(
     <div class="section">
       <div class="container" style={{
@@ -187,9 +242,15 @@ const LogInForm = ({error}: {error:string}) => { // eslint-disable-line no-unuse
           <div classs="control">
             <label class="label">API Key</label>
             <p class='help'>You need a <a>MovieDB API Key</a> in order to access movies' data</p>
-            <input class="input is-light" type="text" placeholder="MovieDB API key..."></input>
+            <input
+              class="input is-light"
+              type="text"
+              placeholder="MovieDB API key..."
+              onInput={ (e) => state.apiKey = e.target.value }
+              onKeyDown={ (e) => onReturn(e) }>
+            </input>
             <p class="help is-danger">{error}</p>
-            <button class="button is-light">Submit</button>
+            <button class="button is-light" onClick={() => doLogin()}>Submit</button>
           </div>
         </div>
       </div>
@@ -223,9 +284,9 @@ const MovieBox = ({movie}: {movie: Movie}) => { // eslint-disable-line no-unused
       { movie !== 'nullMovie'
         ? <div class='box has-text-centered'>
            <h1 class='title is-5'>{movie.title}</h1>
-           <img src={require('../src/no-image.png')} height='300' width='200' />
-           <p>Genere: {movie.genres}</p>
-           <p>Rating: {movie.rating} / 10</p>
+           <img src={movie.poster} height='300' width='200' />
+           <p><b>Generes:</b> {length(movie.genres) > 3 ? append(' ...', take(2, movie.genres)) : movie.genres}</p>
+           <p><b>Rating:</b> {movie.rating} / 10</p>
          </div>
         : <div></div>
       }
@@ -254,9 +315,9 @@ const MovieExplorer = ({movies}: {movies: Array<Movie>}) => { // eslint-disable-
 };
 
 const FilterBox = ( // eslint-disable-line no-unused-vars
-  {generes, ratings, activeDrop, filterdGeneres, filterdRatings}: 
+  {genres, ratings, activeDrop, filterdGeneres, filterdRatings}: 
   {
-    generes: Array<string>
+    genres: Array<string>
     , ratings: Array<number>
     , activeDrop: ActiveDrop
     , filterdGeneres: Array<string>
@@ -293,7 +354,7 @@ const FilterBox = ( // eslint-disable-line no-unused-vars
                     <a href="#" class="dropdown-item">
                       {genere}
                     </a>);}
-                , generes)
+                , genres)
               }
             </div>
           </div>
@@ -382,24 +443,45 @@ export const App = enhance(({store, dispatch}) => { // eslint-disable-line no-un
         ? 'Check internet connection' 
         : '';
     const view = !cs.hasCredential || !cs.credentialAreValid
-      ? LogInForm({error: logInError})
+      ? LogInForm({error: logInError, dispatch: dispatch, store})
       : <div>
-         {ShowTitle({title: store.title})}
-         {ChangeTitle({dispatch: dispatch, control: cs})}
+        {
+          [
+            FilterBox({
+                genres: ['a','s','d','f']
+              , ratings: [1,2,3,4], activeDrop: store.activeDrop
+              , filterdGeneres: store.filterdGeneres
+              , filterdRatings: store.filterdRatings
+            })
+            , MovieExplorer({movies: store.movies})
+          ]
+        }
        </div>;
-  //return <div class='bd-main'><Hero isMobile={store.isMobile}/>{view}</div>;
-  return <div class='bd-main'><Hero isMobile={store.isMobile}/>
-    {
-      [
-        FilterBox({
-            generes: ['a','s','d','f']
-          , ratings: [1,2,3,4], activeDrop: store.activeDrop
-          , filterdGeneres: store.filterdGeneres
-          , filterdRatings: store.filterdRatings
-        })
-        , MovieExplorer({movies: repeat(testMovie, 13)})
-      ]
-    }
-    </div>;
+  return <div class='bd-main'><Hero isMobile={store.isMobile}/>{view}</div>;
+  });
+
+
+////
+
+const fetchMovies = async(state: Model, dispatch) => {
+  const movieMapper = (result, genres) => map(
+    (m) => { 
+             return { title: m.title.split(':')[0]
+                    , genres: map((id) => genres[id] + ' ', m.genre_ids)
+                    , poster: getPosterUrl(m.poster_path)
+                    , rating: m.vote_average
+                    , isSelected: false
+                    };
+           }, result.results);
+  try {
+    const genres = mergeAll(map( (x) => assoc(x.id, x.name, {})
+                                , JSON.parse(await promisify(theMovieDb.genres.getMovieList, [{}])).genres));
+    const nowPlaying = movieMapper(JSON.parse(await promisify(theMovieDb.movies.getNowPlaying, [{}])), genres);
+    dispatch(updateMovies(nowPlaying));
   }
-);
+  catch(e) {
+    if (e.status_code === 7) {
+    dispatch(udpateControl({...state.controlState, credentialAreValid: false}));
+    }
+  }
+}; 
