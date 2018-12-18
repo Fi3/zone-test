@@ -1,13 +1,16 @@
 /* @flow */
 import { withReducer } from 'recompose';
 import React from 'react'; // eslint-disable-line no-unused-vars
-import {map, splitEvery, concat, repeat, length, mergeAll, assoc, take, append} from 'ramda';
+import {map, splitEvery, concat, repeat, length, mergeAll, assoc, take, append, flatten, without, reject, contains, not, reduce, compose} from 'ramda';
 import theMovieDb from 'themoviedb-javascript-library';
 
 // UTILS --section
 const getPosterUrl = (path: string): PosterUrl => `https://image.tmdb.org/t/p/w200/${path}`; // eslint-disable-line
 const setMovieDBKey = (key: string) => theMovieDb.common.api_key = key; 
 const promisify = (f, ...args) => new Promise((res, rej) => f(args, res, rej));
+const appendSet = (el, list) => [...new Set(append(el, list))];
+const atLeastOne = (compare, list) => reduce((a, x) => compare(x) || a, false, list);
+const appendFlat = compose(flatten, append);
 
 // UPDATE --section
 type ActionUpdateTitle =
@@ -38,6 +41,36 @@ type ActionUpdateMovies =
      +movies: Array<Movie>
   |};
 
+type ActionSetActiveDrop =
+  {| +type: 'ActionSetActiveDrop',
+     +activeDrop: 'gen' | 'rating' | ''
+  |};
+
+type ActionAddFilteredGen =
+  {| +type: 'ActionAddFilteredGen',
+     +gen: string
+  |};
+
+type ActionRemoveFilteredGen =
+  {| +type: 'ActionRemoveFilteredGen',
+     +gen: string
+  |};
+
+type ActionAddFilteredRat =
+  {| +type: 'ActionAddFilteredRat',
+     +rat: number
+  |};
+
+type ActionRemoveFilteredRat =
+  {| +type: 'ActionRemoveFilteredRat',
+     +rat: number
+  |};
+
+type ActionUpdatePrimaryFilter =
+  {| +type: 'ActionUpdatePrimaryFilter',
+     +filter: 'Rating' | 'Genre' | ''
+  |};
+
 type Action =
   | ActionUpdateTitle
   | ActionDoNothing
@@ -45,6 +78,12 @@ type Action =
   | ActionUpdateControl
   | ActionUpdateImages
   | ActionUpdateMovies
+  | ActionSetActiveDrop
+  | ActionAddFilteredGen
+  | ActionRemoveFilteredGen
+  | ActionAddFilteredRat
+  | ActionRemoveFilteredRat
+  | ActionUpdatePrimaryFilter
 
 const udpateTitle = (title: string): ActionUpdateTitle => { // eslint-disable-line no-unused-vars
   return {
@@ -83,6 +122,48 @@ const updateMovies = (movies: Array<Movie>): ActionUpdateMovies => { // eslint-d
   return {
     type: 'ActionUpdateMovies',
     movies,
+  };
+};
+
+const setActiveDrop = (activeDrop: 'gen' | 'rating' | ''): ActionSetActiveDrop => { // eslint-disable-line no-unused-vars
+  return {
+    type: 'ActionSetActiveDrop',
+    activeDrop,
+  };
+};
+
+const addFilteredGen = (gen: string): ActionAddFilteredGen => { // eslint-disable-line no-unused-vars
+  return {
+    type: 'ActionAddFilteredGen',
+    gen,
+  };
+};
+
+const removeFilteredGen = (gen: string): ActionRemoveFilteredGen => { // eslint-disable-line no-unused-vars
+  return {
+    type: 'ActionRemoveFilteredGen',
+    gen,
+  };
+};
+
+const addFilteredRat = (rat: number): ActionAddFilteredRat => { // eslint-disable-line no-unused-vars
+  return {
+    type: 'ActionAddFilteredRat',
+    rat,
+  };
+};
+
+const removeFilteredRat = (rat: number): ActionRemoveFilteredRat => { // eslint-disable-line no-unused-vars
+  return {
+    type: 'ActionRemoveFilteredRat',
+    rat,
+  };
+};
+
+const updatePrimaryFilter = (filter: 'Rating' | 'Genre' | ''): ActionUpdatePrimaryFilter => { // eslint-disable-line no-unused-vars
+  return {
+    type: 'ActionUpdatePrimaryFilter',
+    filter,
   };
 };
 
@@ -126,6 +207,35 @@ const reducer = (state: Model, action: Action): Model => {
     return {...state, movies: action.movies};
   }
 
+  case 'ActionSetActiveDrop': {
+    return {...state, activeDrop: action.activeDrop};
+  }
+
+  case 'ActionAddFilteredGen': {
+    return {...state, filterdGeneres: appendSet(action.gen, state.filterdGeneres)};
+  }
+
+  case 'ActionRemoveFilteredGen': {
+    return {...state, filterdGeneres: without(action.gen, state.filterdGeneres)};
+  }
+
+  case 'ActionAddFilteredRat': {
+    return {...state, filterdRatings: appendSet(action.rat, state.filterdRatings)};
+  }
+
+  case 'ActionRemoveFilteredRat': {
+    return {...state, filterdRatings: without(parseFloat(action.rat), parseFloat(state.filterdRatings))};
+  }
+
+  case 'ActionUpdatePrimaryFilter': {
+    if (state.primaryFilter !== '' && action.filter !== '') {
+      return state;
+    }
+    else {
+      return {...state, primaryFilter: action.filter};
+    }
+  }
+
   // trick to have flow errors when we do not handle all the action types
   default:
     (action: empty);
@@ -146,7 +256,7 @@ type Movie =
 
 const testMovie : Movie =
   { title: 'TITLE'
-  , genres: ['Genere']
+  , genres: ['Genre']
   , poster: 'noUrl'
   , rating: 6
   , isSelected: true
@@ -165,6 +275,7 @@ type Model =
      +activeDrop: ActiveDrop,
      +filterdGeneres: Array<string>,
      +filterdRatings: Array<number>,
+     +primaryFilter: 'Rating' | 'Genre' | '',
   |}
 
 // CONTROL STATE
@@ -315,13 +426,14 @@ const MovieExplorer = ({movies}: {movies: Array<Movie>}) => { // eslint-disable-
 };
 
 const FilterBox = ( // eslint-disable-line no-unused-vars
-  {genres, ratings, activeDrop, filterdGeneres, filterdRatings}: 
+  {genres, ratings, activeDrop, filterdGeneres, filterdRatings, dispatch}: 
   {
-    genres: Array<string>
+      genres: Array<string>
     , ratings: Array<number>
     , activeDrop: ActiveDrop
     , filterdGeneres: Array<string>
     , filterdRatings: Array<number>
+    , dispatch: (any) => any
   }) => {
   const genresClass =
     activeDrop === 'gen'
@@ -339,7 +451,12 @@ const FilterBox = ( // eslint-disable-line no-unused-vars
       <div>
         <div class={genresClass}>
           <div class="dropdown-trigger">
-            <button class="button" aria-haspopup="true" aria-controls="dropdown-menu">
+            <button 
+              class="button"
+              aria-haspopup="true"
+              aria-controls="dropdown-menu"
+              onClick={() => activeDrop === 'gen' ? dispatch(setActiveDrop('')) : dispatch(setActiveDrop('gen'))}
+            >
               <span>Generes</span>
               <span class="icon is-small">
                 <i class="fas fa-angle-down" aria-hidden="true"></i>
@@ -349,10 +466,19 @@ const FilterBox = ( // eslint-disable-line no-unused-vars
           <div class="dropdown-menu" id="dropdown-menu" role="menu">
             <div class="dropdown-content">
               {map(
-                (genere) => {
+                (genre) => {
                   return(
-                    <a href="#" class="dropdown-item">
-                      {genere}
+                    <a
+                      href="#"
+                      class="dropdown-item"
+                      onClick={() => {
+                        dispatch(addFilteredGen(genre));
+                        dispatch(setActiveDrop(''));
+                        dispatch(updatePrimaryFilter('Genre'));
+                        }
+                      }
+                    >
+                      {genre}
                     </a>);}
                 , genres)
               }
@@ -365,7 +491,7 @@ const FilterBox = ( // eslint-disable-line no-unused-vars
               <a class="button is-success is-outlined" style={{marginLeft: '10px'}}>
                 <span>{genre}</span>
                 <span class="icon is-small">
-                  <i class="fas fa-times"></i>
+                  <i class="fas fa-times" onClick={() => dispatch(removeFilteredGen(genre))}></i>
                 </span>
               </a>
             );}
@@ -375,7 +501,12 @@ const FilterBox = ( // eslint-disable-line no-unused-vars
       <div>
         <div class={ratingClass}>
           <div class="dropdown-trigger">
-            <button class="button" aria-haspopup="true" aria-controls="dropdown-menu">
+            <button
+              class="button"
+              aria-haspopup="true"
+              aria-controls="dropdown-menu"
+              onClick={() => activeDrop === 'rating' ? dispatch(setActiveDrop('')) : dispatch(setActiveDrop('rating'))}
+            >
               <span>Rating</span>
               <span class="icon is-small">
                 <i class="fas fa-angle-down" aria-hidden="true"></i>
@@ -387,7 +518,16 @@ const FilterBox = ( // eslint-disable-line no-unused-vars
               {map(
                 (rating) => {
                   return(
-                    <a href="#" class="dropdown-item">
+                    <a
+                      href="#"
+                      class="dropdown-item"
+                      onClick={() => {
+                        dispatch(addFilteredRat(rating));
+                        dispatch(setActiveDrop(''));
+                        dispatch(updatePrimaryFilter('Rating'));
+                        }
+                      }
+                    >
                       {rating}
                     </a>);}
                 , ratings)
@@ -400,7 +540,7 @@ const FilterBox = ( // eslint-disable-line no-unused-vars
                 <a class="button is-success is-outlined" style={{marginLeft: '10px'}}>
                   <span>{rating}</span>
                   <span class="icon is-small">
-                    <i class="fas fa-times"></i>
+                    <i class="fas fa-times" onClick={() => dispatch(removeFilteredRat(rating))}></i>
                   </span>
                 </a>
               );}
@@ -430,13 +570,25 @@ const initialState: Model =
     credentials: '',
     controlState: intialControlState,
     activeDrop: '',
-    filterdGeneres: ['ciao'],
-    filterdRatings: [2,3],
+    filterdGeneres: [],
+    filterdRatings: [],
+    primaryFilter: '',
   };
 
 const enhance = withReducer('store', 'dispatch', reducer, initialState);
 export const App = enhance(({store, dispatch}) => { // eslint-disable-line no-unused-vars
     const cs = store.controlState;
+    const filter = appendFlat(store.filterdGeneres, store.filterdRatings);
+    const filterGenres = (movies) => reject(m => not(atLeastOne(x => contains(x, filter), m.genres)), movies);
+    const filterRating = (movies) => reject(m => not(atLeastOne(x => contains(x, filter), append(m.rating, []))), movies);
+    if(length(filter) === 0 && store.primaryFilter !== '') {
+      dispatch(updatePrimaryFilter(''));
+    }
+    const filteredMovies = length(filter) === 0
+      ? store.movies
+      : store.primaryFilter === 'Genre'
+        ? length(store.filterdRatings) !== 0 ? filterRating(filterGenres(store.movies)) : filterGenres(store.movies)
+        : length(store.filterdGeneres) !== 0 ? filterGenres(filterRating(store.movies)) : filterRating(store.movies);
     const logInError = !cs.credentialAreValid 
       ? 'Invalid API Key' 
       : !cs.hasConnetion 
@@ -448,12 +600,18 @@ export const App = enhance(({store, dispatch}) => { // eslint-disable-line no-un
         {
           [
             FilterBox({
-                genres: ['a','s','d','f']
-              , ratings: [1,2,3,4], activeDrop: store.activeDrop
+                genres: store.primaryFilter !== '' && store.primaryFilter !== 'Rating' 
+                  ? [...new Set(flatten(map((m) => m.genres, store.movies)))]
+                  : [...new Set(flatten(map((m) => m.genres, filteredMovies)))]
+              , ratings: store.primaryFilter !== '' && store.primaryFilter !== 'Genre'
+                  ? [...new Set(flatten(map((m) => m.rating, store.movies)))]
+                  : [...new Set(flatten(map((m) => m.rating, filteredMovies)))]
+              , activeDrop: store.activeDrop
               , filterdGeneres: store.filterdGeneres
               , filterdRatings: store.filterdRatings
+              , dispatch
             })
-            , MovieExplorer({movies: store.movies})
+            , MovieExplorer({movies: filteredMovies})
           ]
         }
        </div>;
@@ -461,7 +619,7 @@ export const App = enhance(({store, dispatch}) => { // eslint-disable-line no-un
   });
 
 
-////
+//
 
 const fetchMovies = async(state: Model, dispatch) => {
   const movieMapper = (result, genres) => map(
